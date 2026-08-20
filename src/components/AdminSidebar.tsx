@@ -8,8 +8,13 @@ import {
   Users, 
   Image, 
   Store,
-  X
+  X,
+  LogOut
 } from "lucide-react";
+import logoUrl from "../assets/Logo.jpg";
+import { auth } from "../firebase";
+import { signOut } from "firebase/auth";
+import { toast } from "react-toastify";
 
 interface AdminSidebarProps {
   ordersCount: number;
@@ -50,7 +55,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Sidebar Drawer Container */}
       <aside className={`
-        fixed top-0 bottom-0 left-0 z-50 w-64 bg-[#1b1c1a] text-white flex flex-col justify-between p-4 border-r border-white/10 shadow-2xl transition-transform duration-300 ease-in-out
+        fixed top-0 bottom-0 left-0 z-50 w-64 bg-[#585e4c] text-white flex flex-col justify-between p-4 border-r border-white/10 shadow-2xl transition-transform duration-300 ease-in-out
         lg:static lg:translate-x-0
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
@@ -58,14 +63,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           {/* Brand Header */}
           <div className="pt-2 px-2 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#8e4d31] flex items-center justify-center text-white shadow-lg">
-                <span className="material-symbols-outlined text-2xl">grid_view</span>
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white shadow-lg overflow-hidden border border-white/20">
+                <img src={logoUrl} alt="CrochCosmo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="font-serif-title text-xl font-bold tracking-wide text-white leading-tight">
-                  Yarn & Crochet
+                  CrochCosmo
                 </h1>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#8e4d31] block">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-100/80 block">
                   Control Hub • Admin
                 </span>
               </div>
@@ -91,8 +96,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   onClick={onClose}
                   className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold tracking-wide transition-all ${
                     isActive
-                      ? "bg-[#8e4d31] text-white shadow-md shadow-[#8e4d31]/30 font-bold"
-                      : "text-gray-400 hover:text-white hover:bg-white/5"
+                      ? "bg-[#44493b] text-white shadow-md shadow-black/20 font-bold"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -111,7 +116,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Footer Info */}
-        <div className="pt-4 border-t border-white/10 space-y-3">
+        <div className="pt-4 border-t border-white/10 space-y-3 mt-auto">
           <a
             href="http://localhost:5173"
             target="_blank"
@@ -121,7 +126,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             <Store size={14} />
             View Live Store Front →
           </a>
-          <div className="text-center">
+          <button
+            onClick={() => {
+              signOut(auth)
+                .then(() => toast.info("Logged out successfully"))
+                .catch((error) => console.error(error));
+            }}
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-xs text-rose-300 font-medium rounded-xl transition-all"
+          >
+            <LogOut size={14} />
+            Sign Out
+          </button>
+          <div className="text-center pt-2">
             <p className="text-[11px] text-gray-400">Firebase Backend v10.12</p>
             <p className="text-[10px] text-amber-400 font-semibold mt-0.5">PKR Rate: 1 USD = {exchangeRate} PKR</p>
           </div>

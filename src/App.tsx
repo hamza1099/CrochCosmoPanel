@@ -9,6 +9,7 @@ import { CustomOrdersPage } from "./pages/CustomOrdersPage";
 import { ArtisansPage } from "./pages/ArtisansPage";
 import { BannersPage } from "./pages/BannersPage";
 import { AssetsPage } from "./pages/AssetsPage";
+import { LoginPage } from "./pages/LoginPage";
 
 
 import { 
@@ -31,10 +32,14 @@ import {
   saveArtisanToDB,
   deleteArtisanFromDB,
   saveBannerToDB,
-  deleteBannerFromDB
+  deleteBannerFromDB,
+  auth
 } from "./firebase";
 import { SkeletonLoader } from "./components/SkeletonLoader";
 import { collection, onSnapshot } from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export const App: React.FC = () => {
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -45,8 +50,14 @@ export const App: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<number>(280);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [adminUser, setAdminUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setAdminUser(user);
+      setIsAuthLoading(false);
+    });
     // Listen to real-time products updates from Firestore
     const unsubProducts = onSnapshot(
       collection(db, "products"),
@@ -108,6 +119,7 @@ export const App: React.FC = () => {
       unsubInquiries();
       unsubArtisans();
       unsubBanners();
+      unsubscribeAuth();
       clearTimeout(loadingTimer);
     };
   }, []);
@@ -159,6 +171,23 @@ export const App: React.FC = () => {
     });
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#f8f7f4] flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-[#585e4c]/20 border-t-[#585e4c] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!adminUser) {
+    return (
+      <>
+        <ToastContainer position="top-right" theme="light" />
+        <LoginPage />
+      </>
+    );
+  }
+
   return (
     <Router>
       <div className="flex min-h-screen bg-[#f8f7f4] text-[#1b1c1a]">
@@ -169,6 +198,10 @@ export const App: React.FC = () => {
           exchangeRate={exchangeRate}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+        />
+        <ToastContainer 
+          position="top-right" 
+          theme="light"
         />
 
         {/* Main Content Body */}

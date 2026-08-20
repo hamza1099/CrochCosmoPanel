@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Upload } from "lucide-react";
 import { BannerItem, saveBannerToDB, deleteBannerFromDB } from "../firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { uploadToBunny, deleteFromBunny } from "../services/bunnyStorageService";
 
 interface BannersPageProps {
   banners: BannerItem[];
@@ -12,16 +13,18 @@ export const BannersPage: React.FC<BannersPageProps> = ({ banners, setBanners })
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<BannerItem | null>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setImgFn(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        setImgFn("Uploading...");
+        const url = await uploadToBunny(file, "banners");
+        setImgFn(url);
+      } catch (error) {
+        console.error("Banner image upload failed", error);
+        alert("Failed to upload image.");
+        setImgFn("");
+      }
     }
   };
 
@@ -86,6 +89,14 @@ export const BannersPage: React.FC<BannersPageProps> = ({ banners, setBanners })
 
   const confirmDelete = async () => {
     if (bannerToDelete) {
+      const banner = banners.find(b => b.id === bannerToDelete);
+      if (banner && banner.imageUrl) {
+        try {
+          await deleteFromBunny(banner.imageUrl);
+        } catch (e) {
+          console.error("Failed to delete banner image from Bunny Storage:", e);
+        }
+      }
       await deleteBannerFromDB(bannerToDelete);
       setBanners((prev) => prev.filter((b) => b.id !== bannerToDelete));
       setBannerToDelete(null);

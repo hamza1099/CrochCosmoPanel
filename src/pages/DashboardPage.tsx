@@ -32,9 +32,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   return (
     <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
       {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#1b1c1a] via-[#2c2b28] to-[#363430] p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#44493b] via-[#585e4c] to-[#717763] p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
         <div className="space-y-2 relative z-10">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[#8e4d31] bg-[#8e4d31]/20 px-2.5 py-1 rounded-md inline-block border border-[#8e4d31]/30">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[#e8e9e1] bg-white/20 px-2.5 py-1 rounded-md inline-block border border-white/30">
             Executive Summary • Realtime
           </span>
           <h1 className="font-serif-title text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
@@ -59,7 +59,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         <Link to="/orders" className="bg-white p-5 sm:p-6 rounded-2xl border border-[#e4e2de] shadow-xs hover:shadow-md transition-all space-y-3 block group">
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Gross Sales</span>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-[#8e4d31] group-hover:bg-[#8e4d31] group-hover:text-white transition-colors">
+            <div className="p-2.5 rounded-xl bg-[#585e4c]/10 text-[#585e4c] group-hover:bg-[#585e4c] group-hover:text-white transition-colors">
               <DollarSign size={20} />
             </div>
           </div>
@@ -136,7 +136,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <h3 className="font-serif-title text-xl font-bold text-[#1b1c1a]">
               Recent Orders & Sales
             </h3>
-            <Link to="/orders" className="text-xs text-[#8e4d31] hover:underline font-bold uppercase tracking-wider flex items-center gap-1">
+            <Link to="/orders" className="text-xs text-[#585e4c] hover:underline font-bold uppercase tracking-wider flex items-center gap-1">
               View All <ArrowUpRight size={14} />
             </Link>
           </div>
@@ -166,7 +166,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     const calculatedPKR = Math.round(ord.totalUSD * exchangeRate);
                     return (
                       <tr key={ord.id} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="py-3.5 font-mono font-bold text-[#8e4d31]">{ord.id}</td>
+                        <td className="py-3.5 font-mono font-bold text-[#585e4c]">{ord.id}</td>
                         <td className="py-3.5">
                           <div className="font-bold text-[#1b1c1a]">{ord.customerName}</div>
                           <div className="text-[10px] text-gray-400">{ord.email}</div>
@@ -223,7 +223,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="text-xs font-bold text-[#1b1c1a]">{inq.customerName}</h4>
-                        <span className="text-[10px] text-[#8e4d31] font-semibold block">{inq.itemType}</span>
+                        <span className="text-[10px] text-[#585e4c] font-semibold block">{inq.itemType}</span>
                       </div>
                       <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-purple-100 text-purple-800">
                         {inq.status}

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plus, Edit2, Trash2, X, Search, Upload, Eye, Check, Sparkles, Layers, ShoppingBag } from "lucide-react";
 import { ProductItem, saveProductToDB, deleteProductFromDB } from "../firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { uploadToBunny, deleteFromBunny } from "../services/bunnyStorageService";
 
 interface ProductsPageProps {
   products: ProductItem[];
@@ -81,17 +82,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
     setImg3(imgs[2] || "");
   };
 
-  // Convert File upload to DataURL for instant local preview & persistence
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
+  // Upload File to Bunny CDN
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setImgFn(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        setImgFn("Uploading..."); // Temporary state if you want, but simple UX for now
+        const url = await uploadToBunny(file, "products");
+        setImgFn(url);
+      } catch (error) {
+        console.error("Image upload failed", error);
+        alert("Failed to upload image.");
+        setImgFn(""); // Reset on fail
+      }
     }
   };
 
@@ -168,7 +171,20 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
   const confirmDelete = async () => {
     if (productToDelete) {
+      const product = products.find(p => p.id === productToDelete);
       setProducts((prev) => prev.filter((p) => p.id !== productToDelete));
+      
+      if (product) {
+        try {
+          const galleryImgs = product.images && product.images.length > 0 ? product.images : [product.imageUrl];
+          for (const img of galleryImgs) {
+            if (img) await deleteFromBunny(img);
+          }
+        } catch (e) {
+          console.error("Failed to delete product images from Bunny Storage:", e);
+        }
+      }
+      
       await deleteProductFromDB(productToDelete);
       setProductToDelete(null);
     }

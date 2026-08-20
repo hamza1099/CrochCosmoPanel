@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Save, CheckCircle2, Eye, Image as ImageIcon, Plus, Trash2, ChevronLeft, ChevronRight, Layers, Users, Upload, Loader2 } from "lucide-react";
-import { BannerItem, saveBannerToDB, deleteBannerFromDB, uploadImageToFirebaseStorage } from "../firebase";
+import { BannerItem, saveBannerToDB, deleteBannerFromDB } from "../firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { uploadToBunny, deleteFromBunny } from "../services/bunnyStorageService";
+import { toast } from "react-toastify";
 
 interface HeroBannerItem {
   id: string;
@@ -19,61 +21,36 @@ interface AssetsPageProps {
 }
 
 export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exchangeRate, setExchangeRate }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const processImageFile = async (file: File): Promise<string> => {
-    // 1. Try Firebase Cloud Storage first
-    try {
-      const url = await uploadImageToFirebaseStorage(file, "banners");
-      if (url) return url;
-    } catch (e) {
-      console.warn("Storage upload failed, falling back to compressed Canvas JPEG:", e);
-    }
-
-    // 2. Fallback to Canvas JPEG compression (max 1000px width -> ~80KB to fit inside Firestore 1MB limit)
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const maxWidth = 1000;
-          let width = img.width;
-          let height = img.height;
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL("image/jpeg", 0.7));
-          } else {
-            resolve(evt.target?.result as string);
-          }
-        };
-        img.onerror = () => resolve(evt.target?.result as string);
-        img.src = evt.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
+    const url = await uploadToBunny(file, "banners");
+    return url;
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
+  const handleHeroFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setSelectedFiles(files);
+      if (files.length > 0) {
+        // Just show the first one as preview temporarily, or indicate multiple
+        setNewSlideUrl(files.length > 1 ? `${files.length} images selected` : URL.createObjectURL(files[0]));
+      }
+    }
+  };
+  
+  const handleCategoryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Defer network upload: Store local File object and generate instant local preview DataURL
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setImgFn(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        setImgFn("Uploading...");
+        const url = await uploadToBunny(file, "banners");
+        setImgFn(url);
+      } catch (err) {
+        setImgFn("");
+        toast.error("Failed to upload category banner. Check API Key & Region.");
+      }
     }
   };
 
@@ -119,45 +96,79 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
 
   const handleAddSlide = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSlideUrl && !selectedFile) return;
+    if (!newSlideUrl && selectedFiles.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      let finalImageUrl = newSlideUrl;
-      if (selectedFile) {
-        finalImageUrl = await processImageFile(selectedFile);
+      const newSlides: HeroBannerItem[] = [];
+      const newBanners: BannerItem[] = [];
+
+      if (selectedFiles.length > 0) {
+        // Upload multiple files
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const finalImageUrl = await processImageFile(file);
+          const bannerId = `banner-${Date.now()}-${i}`;
+          
+          const slide: HeroBannerItem = {
+            id: bannerId,
+            imageUrl: finalImageUrl,
+            title: newSlideTitle || `Banner Slide #${heroSlides.length + i + 1}`,
+            linkUrl: "/collections",
+            active: true
+          };
+          newSlides.push(slide);
+          
+          newBanners.push({
+            id: bannerId,
+            title: slide.title,
+            subtitle: "Handcrafted Luxury",
+            badge: "Featured",
+            imageUrl: slide.imageUrl,
+            linkUrl: slide.linkUrl,
+            active: true
+          });
+        }
+      } else {
+        // Add single URL
+        const bannerId = `banner-${Date.now()}`;
+        const slide: HeroBannerItem = {
+          id: bannerId,
+          imageUrl: newSlideUrl,
+          title: newSlideTitle || `Banner Slide #${heroSlides.length + 1}`,
+          linkUrl: "/collections",
+          active: true
+        };
+        newSlides.push(slide);
+        
+        newBanners.push({
+          id: bannerId,
+          title: slide.title,
+          subtitle: "Handcrafted Luxury",
+          badge: "Featured",
+          imageUrl: slide.imageUrl,
+          linkUrl: slide.linkUrl,
+          active: true
+        });
       }
 
-      const bannerId = `banner-${Date.now()}`;
-      const newSlide: HeroBannerItem = {
-        id: bannerId,
-        imageUrl: finalImageUrl,
-        title: newSlideTitle || `Banner Slide #${heroSlides.length + 1}`,
-        linkUrl: "/collections",
-        active: true
-      };
-
-      const newBannerItem: BannerItem = {
-        id: bannerId,
-        title: newSlide.title,
-        subtitle: "Handcrafted Luxury",
-        badge: "Featured",
-        imageUrl: newSlide.imageUrl,
-        linkUrl: newSlide.linkUrl,
-        active: true
-      };
-
-      setHeroSlides((prev) => [...prev, newSlide]);
+      setHeroSlides((prev) => [...prev, ...newSlides]);
       setNewSlideUrl("");
       setNewSlideTitle("");
-      setSelectedFile(null);
+      setSelectedFiles([]);
 
       if (setBanners) {
-        setBanners((prev) => [...prev.filter((b) => b.id !== bannerId), newBannerItem]);
+        setBanners((prev) => [...prev, ...newBanners]);
       }
-      await saveBannerToDB(newBannerItem);
+      
+      for (const b of newBanners) {
+        await saveBannerToDB(b);
+      }
+      
+      toast.success("Banners successfully uploaded and added!");
     } catch (err) {
       console.error("Error adding banner slide:", err);
+      toast.error("Failed to upload banners. Check if your Bunny Storage Access Key and Region are correct.");
     } finally {
       setIsSubmitting(false);
     }
@@ -167,6 +178,15 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
 
   const confirmDelete = async () => {
     if (slideToDelete) {
+      const slide = heroSlides.find(s => s.id === slideToDelete);
+      if (slide && slide.imageUrl) {
+        try {
+          await deleteFromBunny(slide.imageUrl);
+        } catch (e) {
+          console.error("Failed to delete banner slide image from Bunny Storage:", e);
+        }
+      }
+      
       setHeroSlides((prev) => prev.filter((s) => s.id !== slideToDelete));
       setCurrentPreviewSlide(0);
 
@@ -378,12 +398,13 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
                     <label className="block font-bold text-gray-600 mb-1 uppercase">Banner Image (Upload Photo or Paste Link)</label>
                     <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-2">
                       <label className="px-4 py-2.5 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap">
-                        <Upload size={15} /> Select Photo File
+                        <Upload size={15} /> Select Photo(s)
                         <input
                           type="file"
                           accept="image/*"
+                          multiple
                           className="hidden"
-                          onChange={(e) => handleFileUpload(e, setNewSlideUrl)}
+                          onChange={handleHeroFileUpload}
                         />
                       </label>
                       <input
@@ -392,12 +413,12 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
                         value={newSlideUrl}
                         onChange={(e) => {
                           setNewSlideUrl(e.target.value);
-                          setSelectedFile(null);
+                          setSelectedFiles([]);
                         }}
                         className="flex-grow p-2.5 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
                       />
                     </div>
-                    {newSlideUrl && (
+                    {newSlideUrl && !newSlideUrl.includes("selected") && (
                       <div className="relative w-full h-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 mb-2">
                         <img src={newSlideUrl} alt="Banner Preview" className="w-full h-full object-cover" />
                       </div>
@@ -451,7 +472,7 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => handleFileUpload(e, setWomenBannerUrl)}
+                          onChange={(e) => handleCategoryFileUpload(e, setWomenBannerUrl)}
                         />
                       </label>
                       <input
@@ -489,7 +510,7 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => handleFileUpload(e, setMenBannerUrl)}
+                          onChange={(e) => handleCategoryFileUpload(e, setMenBannerUrl)}
                         />
                       </label>
                       <input
@@ -527,7 +548,7 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => handleFileUpload(e, setBabyBannerUrl)}
+                          onChange={(e) => handleCategoryFileUpload(e, setBabyBannerUrl)}
                         />
                       </label>
                       <input

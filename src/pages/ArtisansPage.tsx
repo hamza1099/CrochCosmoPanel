@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plus, Award, Trash2, Edit2, X } from "lucide-react";
 import { Artisan, saveArtisanToDB, deleteArtisanFromDB } from "../firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { uploadToBunny, deleteFromBunny } from "../services/bunnyStorageService";
 
 interface ArtisansPageProps {
   artisans: Artisan[];
@@ -11,6 +12,21 @@ interface ArtisansPageProps {
 export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisans }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingArtisan, setEditingArtisan] = useState<Artisan | null>(null);
+  
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setImgFn("Uploading...");
+        const url = await uploadToBunny(file, "artisans");
+        setImgFn(url);
+      } catch (error) {
+        console.error("Artisan image upload failed", error);
+        alert("Failed to upload image.");
+        setImgFn("");
+      }
+    }
+  };
 
   const [newArtisan, setNewArtisan] = useState<Partial<Artisan>>({
     name: "",
@@ -60,6 +76,14 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
 
   const confirmDelete = async () => {
     if (artisanToDelete) {
+      const artisan = artisans.find(a => a.id === artisanToDelete);
+      if (artisan && artisan.imageUrl) {
+        try {
+          await deleteFromBunny(artisan.imageUrl);
+        } catch (e) {
+          console.error("Failed to delete artisan image from Bunny Storage:", e);
+        }
+      }
       setArtisans((prev) => prev.filter((a) => a.id !== artisanToDelete));
       await deleteArtisanFromDB(artisanToDelete);
       setArtisanToDelete(null);
@@ -218,12 +242,23 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
 
               <div>
                 <label className="block font-bold text-gray-600 mb-1 uppercase">Photo URL</label>
-                <input
-                  type="text"
-                  value={newArtisan.imageUrl}
-                  onChange={(e) => setNewArtisan({ ...newArtisan, imageUrl: e.target.value })}
-                  className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31]"
-                />
+                <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                  <label className="px-4 py-3 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center shadow-xs whitespace-nowrap">
+                    Upload Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, (url) => setNewArtisan({ ...newArtisan, imageUrl: url }))}
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    value={newArtisan.imageUrl}
+                    onChange={(e) => setNewArtisan({ ...newArtisan, imageUrl: e.target.value })}
+                    className="flex-grow p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31]"
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -300,12 +335,23 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
 
               <div>
                 <label className="block font-bold text-gray-600 mb-1 uppercase">Photo URL</label>
-                <input
-                  type="text"
-                  value={editingArtisan.imageUrl}
-                  onChange={(e) => setEditingArtisan({ ...editingArtisan, imageUrl: e.target.value })}
-                  className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31]"
-                />
+                <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                  <label className="px-4 py-3 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center shadow-xs whitespace-nowrap">
+                    Upload Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, (url) => setEditingArtisan({ ...editingArtisan, imageUrl: url }))}
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    value={editingArtisan.imageUrl}
+                    onChange={(e) => setEditingArtisan({ ...editingArtisan, imageUrl: e.target.value })}
+                    className="flex-grow p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31]"
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
