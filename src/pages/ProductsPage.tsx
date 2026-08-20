@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Plus, Edit2, Trash2, X, Search, Upload, Eye, Check, Sparkles, Layers } from "lucide-react";
-import { ProductItem } from "../firebase";
+import { Plus, Edit2, Trash2, X, Search, Upload, Eye, Check, Sparkles, Layers, ShoppingBag } from "lucide-react";
+import { ProductItem, saveProductToDB, deleteProductFromDB } from "../firebase";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 interface ProductsPageProps {
   products: ProductItem[];
@@ -48,8 +49,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
     setFormDescription(
       "Handcrafted with love by our collective of women artisans. Made from 100% locally sourced organic wool, this sweater is incredibly soft, breathable, and designed to gently embrace your little one."
     );
-    setFormColorsStr("Beige, Oatmeal, Sage");
-    setFormSizesStr("0-3M, 3-6M, 6-12M");
+    setFormColorsStr("");
+    setFormSizesStr("");
     setFormPersonalization(true);
     setImg1("https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80");
     setImg2("");
@@ -94,7 +95,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
     }
   };
 
-  const handleSaveAdd = (e: React.FormEvent) => {
+  const handleSaveAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName || !formPrice) return;
 
@@ -119,10 +120,11 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
     };
 
     setProducts((prev) => [newItem, ...prev]);
+    await saveProductToDB(newItem);
     setShowAddModal(false);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
 
@@ -147,18 +149,28 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
     setProducts((prev) =>
       prev.map((p) => (p.id === editingProduct.id ? updatedItem : p))
     );
+    await saveProductToDB(updatedItem);
     setEditingProduct(null);
   };
 
-  const toggleStock = (id: string) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, inStock: !p.inStock } : p))
-    );
+  const toggleStock = async (id: string) => {
+    const product = products.find(p => p.id === id);
+    if (product) {
+      const updatedProduct = { ...product, inStock: !product.inStock };
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? updatedProduct : p))
+      );
+      await saveProductToDB(updatedProduct);
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    if (confirm("Are you sure you want to delete this product from catalog?")) {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (productToDelete) {
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete));
+      await deleteProductFromDB(productToDelete);
+      setProductToDelete(null);
     }
   };
 
@@ -172,6 +184,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto font-sans">
+      <ConfirmModal
+        isOpen={!!productToDelete}
+        title="Delete Product"
+        message="Are you sure you want to delete this product from the catalog? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setProductToDelete(null)}
+      />
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -186,7 +206,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
           onClick={openAddModal}
           className="px-5 py-3 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
         >
-          <Plus size={16} /> + Add New Product (2-3 Pics)
+          <Plus size={16} /> Add New Product
         </button>
       </div>
 
@@ -237,7 +257,22 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f1efeb]">
-            {filteredProducts.map((prod) => {
+            {filteredProducts.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-16 text-center text-gray-400">
+                  <ShoppingBag className="mx-auto mb-3 text-gray-300" size={40} />
+                  <p className="font-bold text-gray-600 text-base">No products in catalog yet</p>
+                  <p className="text-xs text-gray-400 max-w-sm mx-auto mt-1 mb-4">Click the button below to add your first handcrafted product with photos and inventory.</p>
+                  <button
+                    onClick={openAddModal}
+                    className="px-5 py-2.5 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md inline-flex items-center gap-2"
+                  >
+                    <Plus size={16} /> + Add Your First Product
+                  </button>
+                </td>
+              </tr>
+            ) : (
+              filteredProducts.map((prod) => {
               const galleryImgs = prod.images && prod.images.length > 0 ? prod.images : [prod.imageUrl];
               return (
                 <tr key={prod.id} className="hover:bg-gray-50/60 transition-colors">
@@ -345,7 +380,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                         <Edit2 size={15} />
                       </button>
                       <button
-                        onClick={() => deleteProduct(prod.id)}
+                        onClick={() => setProductToDelete(prod.id)}
                         className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Delete Product"
                       >
@@ -355,7 +390,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                   </td>
                 </tr>
               );
-            })}
+            })
+            )}
           </tbody>
         </table>
       </div>
@@ -370,7 +406,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                   {showAddModal ? "Create Handcrafted Listing" : "Update Existing Item"}
                 </span>
                 <h3 className="font-serif-title text-2xl font-bold text-[#1b1c1a]">
-                  {showAddModal ? "Add Product with 2-3 Pictures" : "Edit Product Details"}
+                  {showAddModal ? "Add New Product" : "Edit Product Details"}
                 </h3>
               </div>
               <button
@@ -386,10 +422,10 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
             <form onSubmit={showAddModal ? handleSaveAdd : handleSaveEdit} className="space-y-5 text-xs">
               
-              {/* SECTION: 2-3 PRODUCT PICTURES (FILE UPLOAD & URL) */}
+              {/* SECTION: PRODUCT PICTURES (FILE UPLOAD & URL) */}
               <div className="p-4 bg-[#f8f7f4] rounded-2xl border border-[#e4e2de] space-y-4">
                 <span className="font-bold text-[#8e4d31] uppercase text-xs block flex items-center gap-1.5">
-                  <Layers size={15} /> Product Gallery Pictures (2-3 Photos)
+                  <Layers size={15} /> Product Gallery Pictures
                 </span>
                 <p className="text-[11px] text-gray-500">
                   Upload image files directly from your computer or paste image links. Pic 1 acts as the main hero photo.
@@ -611,24 +647,61 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
               {/* COLOR & SIZE VARIANTS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-gray-600 mb-1 uppercase">Color Variants (comma-separated)</label>
+                  <label className="block font-bold text-gray-600 mb-1 uppercase">Available Colors (comma-separated)</label>
                   <input
                     type="text"
-                    placeholder="Beige, Oatmeal, Sage"
+                    placeholder="e.g. Beige, Oatmeal, Sage, Custom"
                     value={formColorsStr}
                     onChange={(e) => setFormColorsStr(e.target.value)}
-                    className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none"
+                    className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none font-medium text-xs"
                   />
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <span className="text-[10px] text-gray-400 self-center mr-1">Quick Add:</span>
+                    {["Beige", "Oatmeal", "Sage", "Cream", "Dusty Rose", "Navy Blue", "Mustard", "Custom Color"].map((c) => (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => {
+                          const existing = formColorsStr ? formColorsStr.split(",").map((s) => s.trim()).filter(Boolean) : [];
+                          if (!existing.includes(c)) {
+                            setFormColorsStr([...existing, c].join(", "));
+                          }
+                        }}
+                        className="px-2 py-0.5 bg-amber-50 border border-amber-200 hover:bg-[#8e4d31] hover:text-white rounded-md text-[10px] font-semibold text-amber-900 transition-colors"
+                      >
+                        + {c}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
                 <div>
                   <label className="block font-bold text-gray-600 mb-1 uppercase">Size Options (comma-separated)</label>
                   <input
                     type="text"
-                    placeholder="0-3M, 3-6M, 6-12M or S, M, L"
+                    placeholder="e.g. 0-3M, 3-6M, 6-12M or S, M, L, XL"
                     value={formSizesStr}
                     onChange={(e) => setFormSizesStr(e.target.value)}
-                    className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none"
+                    className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none font-medium text-xs"
                   />
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <span className="text-[10px] text-gray-400 self-center mr-1">Quick Add:</span>
+                    {["0-3M", "3-6M", "6-12M", "1-2Y", "Small", "Medium", "Large", "Custom Size"].map((s) => (
+                      <button
+                        type="button"
+                        key={s}
+                        onClick={() => {
+                          const existing = formSizesStr ? formSizesStr.split(",").map((item) => item.trim()).filter(Boolean) : [];
+                          if (!existing.includes(s)) {
+                            setFormSizesStr([...existing, s].join(", "));
+                          }
+                        }}
+                        className="px-2 py-0.5 bg-gray-100 border border-gray-200 hover:bg-[#585e4c] hover:text-white rounded-md text-[10px] font-semibold text-gray-700 transition-colors"
+                      >
+                        + {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -672,13 +745,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
       {/* STOREFRONT PREVIEW MODAL (MATCHING USER SCREENSHOT) */}
       {previewProduct && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#fbf9f5] rounded-3xl p-6 sm:p-8 max-w-4xl w-full space-y-6 shadow-2xl border border-[#e4e2de] max-h-[92vh] overflow-y-auto my-auto text-[#1b1c1a]">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-[#fbf9f5] rounded-3xl p-6 sm:p-8 max-w-5xl w-full space-y-6 shadow-2xl border border-[#e4e2de] max-h-[92vh] overflow-y-auto my-auto text-[#1b1c1a]">
             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
               <span className="text-xs font-bold uppercase tracking-wider text-[#8e4d31] flex items-center gap-1.5">
                 <Sparkles size={16} /> Live Product Detail Page Replica
               </span>
-              <button onClick={() => setPreviewProduct(null)} className="text-gray-400 hover:text-black">
+              <button onClick={() => setPreviewProduct(null)} className="text-gray-400 hover:text-black p-1">
                 <X size={20} />
               </button>
             </div>
@@ -714,7 +787,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                     alt={previewProduct.name}
                     className="w-full h-full object-cover"
                   />
-                  <span className="absolute top-4 left-4 bg-white/90 backdrop-blur-xs text-[#8e4d31] text-[10px] font-bold uppercase px-3 py-1 rounded-full border border-gray-200">
+                  <span className="absolute top-4 left-4 bg-white/90 backdrop-blur-xs text-[#8e4d31] text-[10px] font-bold uppercase px-3 py-1 rounded-full border border-gray-200 shadow-xs">
                     {previewProduct.badge || "Organic"}
                   </span>
                 </div>
@@ -726,7 +799,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#8e4d31]">
                     {previewProduct.category}
                   </span>
-                  <h2 className="font-serif-title text-2xl sm:text-3xl font-bold leading-tight mt-1">
+                  <h2 className="font-serif-title text-2xl sm:text-3xl font-bold leading-tight mt-1 text-[#1b1c1a]">
                     {previewProduct.name}
                   </h2>
                   <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
@@ -745,18 +818,19 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
                 {/* Color selection */}
                 {previewProduct.colors && previewProduct.colors.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 pt-2 border-t border-gray-200/60">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
-                      Color: <strong className="text-black">{previewProduct.colors[0]}</strong>
+                      Color: <strong className="text-[#8e4d31]">{previewProduct.colors[0]}</strong>
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {previewProduct.colors.map((color, idx) => (
                         <button
                           key={color}
-                          className={`px-4 py-1.5 rounded-lg text-xs font-bold border ${
+                          type="button"
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
                             idx === 0
-                              ? "bg-[#8e4d31] text-white border-[#8e4d31]"
-                              : "bg-white text-gray-700 border-gray-300"
+                              ? "bg-[#8e4d31] text-white border-[#8e4d31] shadow-xs"
+                              : "bg-white text-gray-700 border-gray-300 hover:border-[#8e4d31]"
                           }`}
                         >
                           {color}
@@ -772,14 +846,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
                       Size Selection
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {previewProduct.sizes.map((size, idx) => (
                         <button
                           key={size}
-                          className={`px-5 py-2 rounded-xl text-xs font-bold border ${
+                          type="button"
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
                             idx === 0
-                              ? "bg-[#585e4c] text-white border-[#585e4c]"
-                              : "bg-white text-gray-700 border-gray-300"
+                              ? "bg-[#585e4c] text-white border-[#585e4c] shadow-xs"
+                              : "bg-white text-gray-700 border-gray-300 hover:border-[#585e4c]"
                           }`}
                         >
                           {size}
@@ -791,14 +866,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
                 {/* Optional Hand Embroidery Personalization */}
                 {previewProduct.allowPersonalization && (
-                  <div className="space-y-2 pt-2 border-t border-gray-200">
+                  <div className="space-y-2 pt-2 border-t border-gray-200/60">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
                       Hand Embroidery Personalization (Optional)
                     </span>
                     <input
                       type="text"
                       placeholder="e.g. LUNA (max 8 chars)"
-                      className="w-full p-3 bg-white border border-[#c7c7bd] rounded-xl text-xs"
+                      className="w-full p-3 bg-white border border-[#c7c7bd] rounded-xl text-xs focus:outline-none"
                       readOnly
                     />
                   </div>

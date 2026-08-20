@@ -153,36 +153,46 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {orders.map((ord) => {
-                  const calculatedPKR = Math.round(ord.totalUSD * exchangeRate);
-                  return (
-                    <tr key={ord.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="py-3.5 font-mono font-bold text-[#8e4d31]">{ord.id}</td>
-                      <td className="py-3.5">
-                        <div className="font-bold text-[#1b1c1a]">{ord.customerName}</div>
-                        <div className="text-[10px] text-gray-400">{ord.email}</div>
-                      </td>
-                      <td className="py-3.5 font-semibold">
-                        ${ord.totalUSD.toFixed(2)}
-                        <span className="block text-[10px] text-gray-400">Rs. {calculatedPKR.toLocaleString()}</span>
-                      </td>
-                      <td className="py-3.5 text-gray-600 font-medium">{ord.paymentMethod}</td>
-                      <td className="py-3.5">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          ord.status === "Delivered"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : ord.status === "Shipped"
-                            ? "bg-blue-100 text-blue-800"
-                            : ord.status === "Cancelled"
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {ord.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-gray-400">
+                      <Package className="mx-auto mb-2 text-gray-300" size={32} />
+                      <p className="font-semibold text-gray-600 text-sm">No orders recorded yet</p>
+                      <p className="text-[11px] text-gray-400">Orders placed by customers on storefront will appear here live.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  orders.map((ord) => {
+                    const calculatedPKR = Math.round(ord.totalUSD * exchangeRate);
+                    return (
+                      <tr key={ord.id} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="py-3.5 font-mono font-bold text-[#8e4d31]">{ord.id}</td>
+                        <td className="py-3.5">
+                          <div className="font-bold text-[#1b1c1a]">{ord.customerName}</div>
+                          <div className="text-[10px] text-gray-400">{ord.email}</div>
+                        </td>
+                        <td className="py-3.5 font-semibold">
+                          ${ord.totalUSD.toFixed(2)}
+                          <span className="block text-[10px] text-gray-400">Rs. {calculatedPKR.toLocaleString()}</span>
+                        </td>
+                        <td className="py-3.5 text-gray-600 font-medium">{ord.paymentMethod}</td>
+                        <td className="py-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            ord.status === "Delivered"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : ord.status === "Shipped"
+                              ? "bg-blue-100 text-blue-800"
+                              : ord.status === "Cancelled"
+                              ? "bg-rose-100 text-rose-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}>
+                            {ord.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -201,22 +211,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
 
             <div className="space-y-3">
-              {inquiries.map((inq) => (
-                <div key={inq.id} className="p-3.5 bg-[#f8f7f4] rounded-xl border border-[#e4e2de] space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-xs font-bold text-[#1b1c1a]">{inq.customerName}</h4>
-                      <span className="text-[10px] text-[#8e4d31] font-semibold block">{inq.itemType}</span>
-                    </div>
-                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-purple-100 text-purple-800">
-                      {inq.status}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">
-                    "{inq.specs}"
-                  </p>
+              {inquiries.length === 0 ? (
+                <div className="py-8 text-center text-gray-400 space-y-2">
+                  <Sparkles className="mx-auto text-purple-300" size={28} />
+                  <p className="font-semibold text-gray-600 text-xs">No bespoke inquiries yet</p>
+                  <p className="text-[10px] text-gray-400">Custom order requests submitted on storefront will show here.</p>
                 </div>
-              ))}
+              ) : (
+                inquiries.map((inq) => (
+                  <div key={inq.id} className="p-3.5 bg-[#f8f7f4] rounded-xl border border-[#e4e2de] space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-xs font-bold text-[#1b1c1a]">{inq.customerName}</h4>
+                        <span className="text-[10px] text-[#8e4d31] font-semibold block">{inq.itemType}</span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-purple-100 text-purple-800">
+                        {inq.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">
+                      "{inq.specs}"
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

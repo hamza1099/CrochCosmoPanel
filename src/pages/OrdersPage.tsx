@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Search, Mail, Phone, Trash2 } from "lucide-react";
-import { OrderItem } from "../firebase";
+import { Search, Mail, Phone, Trash2, Package } from "lucide-react";
+import { OrderItem, deleteOrderFromDB } from "../firebase";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 interface OrdersPageProps {
   orders: OrderItem[];
@@ -11,6 +12,7 @@ interface OrdersPageProps {
 export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, exchangeRate }) => {
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
   const updateOrderStatus = (orderId: string, newStatus: OrderItem["status"]) => {
     setOrders((prev) =>
@@ -18,9 +20,11 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
     );
   };
 
-  const deleteOrder = (orderId: string) => {
-    if (confirm("Are you sure you want to remove this order?")) {
-      setOrders((prev) => prev.filter((ord) => ord.id !== orderId));
+  const confirmDelete = async () => {
+    if (orderToDelete) {
+      setOrders((prev) => prev.filter((ord) => ord.id !== orderToDelete));
+      await deleteOrderFromDB(orderToDelete);
+      setOrderToDelete(null);
     }
   };
 
@@ -86,8 +90,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
       {/* Orders List */}
       <div className="space-y-4">
         {filteredOrders.length === 0 ? (
-          <div className="bg-white p-12 text-center rounded-2xl border border-[#e4e2de]">
-            <p className="text-sm text-gray-500 font-semibold">No orders match your filter parameters.</p>
+          <div className="bg-white p-12 text-center rounded-2xl border border-[#e4e2de] space-y-3">
+            <Package className="mx-auto text-gray-300" size={40} />
+            <h3 className="text-base font-bold text-gray-700">No Orders Received Yet</h3>
+            <p className="text-xs text-gray-400 max-w-sm mx-auto">When customers place orders on your storefront app, they will automatically appear here in real-time.</p>
           </div>
         ) : (
           filteredOrders.map((ord) => {
@@ -138,7 +144,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
                     </select>
 
                     <button
-                      onClick={() => deleteOrder(ord.id)}
+                      onClick={() => setOrderToDelete(ord.id)}
                       className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                       title="Delete Order"
                     >

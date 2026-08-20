@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Plus, Award, Trash2, Edit2, X } from "lucide-react";
-import { Artisan } from "../firebase";
+import { Artisan, saveArtisanToDB, deleteArtisanFromDB } from "../firebase";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 interface ArtisansPageProps {
   artisans: Artisan[];
@@ -19,7 +20,7 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
     yearsExperience: 5
   });
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newArtisan.name) return;
 
@@ -33,6 +34,7 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
     };
 
     setArtisans((prev) => [...prev, item]);
+    await saveArtisanToDB(item);
     setShowAddModal(false);
     setNewArtisan({
       name: "",
@@ -43,24 +45,37 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
     });
   };
 
-  const handleEdit = (e: React.FormEvent) => {
+  const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingArtisan) return;
 
     setArtisans((prev) =>
       prev.map((a) => (a.id === editingArtisan.id ? editingArtisan : a))
     );
+    await saveArtisanToDB(editingArtisan);
     setEditingArtisan(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to remove this artisan profile?")) {
-      setArtisans((prev) => prev.filter((a) => a.id !== id));
+  const [artisanToDelete, setArtisanToDelete] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (artisanToDelete) {
+      setArtisans((prev) => prev.filter((a) => a.id !== artisanToDelete));
+      await deleteArtisanFromDB(artisanToDelete);
+      setArtisanToDelete(null);
     }
   };
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      <ConfirmModal
+        isOpen={!!artisanToDelete}
+        title="Delete Artisan Profile"
+        message="Are you sure you want to remove this artisan profile? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setArtisanToDelete(null)}
+      />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-widest text-[#8e4d31]">
@@ -78,8 +93,21 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-        {artisans.map((artisan) => (
+      {artisans.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-3xl border border-[#e4e2de] space-y-3">
+          <Award className="mx-auto text-amber-300" size={40} />
+          <h3 className="text-base font-bold text-gray-700">No Artisans Added Yet</h3>
+          <p className="text-xs text-gray-400 max-w-sm mx-auto">Add master crochet artisan profiles to highlight your craft makers on the storefront.</p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-5 py-2.5 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md inline-flex items-center gap-2"
+          >
+            <Plus size={16} /> + Add First Artisan Profile
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+          {artisans.map((artisan) => (
           <div
             key={artisan.id}
             className="bg-white rounded-3xl overflow-hidden border border-[#e4e2de] shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row"
@@ -107,7 +135,7 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
                       <Edit2 size={15} />
                     </button>
                     <button
-                      onClick={() => handleDelete(artisan.id)}
+                      onClick={() => setArtisanToDelete(artisan.id)}
                       className="p-1.5 text-rose-500 hover:text-rose-700 rounded-lg transition-colors"
                       title="Delete Artisan"
                     >
@@ -131,6 +159,7 @@ export const ArtisansPage: React.FC<ArtisansPageProps> = ({ artisans, setArtisan
           </div>
         ))}
       </div>
+      )}
 
       {/* Add Modal */}
       {showAddModal && (

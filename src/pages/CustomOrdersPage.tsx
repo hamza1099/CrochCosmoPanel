@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Mail, Trash2 } from "lucide-react";
-import { CustomInquiry } from "../firebase";
+import { Mail, Trash2, Sparkles } from "lucide-react";
+import { CustomInquiry, deleteInquiryFromDB, saveInquiryToDB } from "../firebase";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 interface CustomOrdersPageProps {
   inquiries: CustomInquiry[];
@@ -15,30 +16,50 @@ export const CustomOrdersPage: React.FC<CustomOrdersPageProps> = ({
 }) => {
   const [editingInquiryId, setEditingInquiryId] = useState<string | null>(null);
   const [quotePrice, setQuotePrice] = useState<number>(150);
+  
+  const [inquiryToDelete, setInquiryToDelete] = useState<string | null>(null);
 
-  const updateStatus = (id: string, newStatus: CustomInquiry["status"]) => {
-    setInquiries((prev) =>
-      prev.map((inq) => (inq.id === id ? { ...inq, status: newStatus } : inq))
-    );
+  const updateStatus = async (id: string, newStatus: CustomInquiry["status"]) => {
+    const updatedInq = inquiries.find((inq) => inq.id === id);
+    if (updatedInq) {
+      setInquiries((prev) =>
+        prev.map((inq) => (inq.id === id ? { ...inq, status: newStatus } : inq))
+      );
+      await saveInquiryToDB({ ...updatedInq, status: newStatus });
+    }
   };
 
-  const submitQuote = (id: string) => {
-    setInquiries((prev) =>
-      prev.map((inq) =>
-        inq.id === id ? { ...inq, estimatedPriceUSD: quotePrice, status: "Quoted" } : inq
-      )
-    );
+  const submitQuote = async (id: string) => {
+    const updatedInq = inquiries.find((inq) => inq.id === id);
+    if (updatedInq) {
+      setInquiries((prev) =>
+        prev.map((inq) =>
+          inq.id === id ? { ...inq, estimatedPriceUSD: quotePrice, status: "Quoted" } : inq
+        )
+      );
+      await saveInquiryToDB({ ...updatedInq, estimatedPriceUSD: quotePrice, status: "Quoted" });
+    }
     setEditingInquiryId(null);
   };
 
-  const deleteInquiry = (id: string) => {
-    if (confirm("Are you sure you want to delete this custom inquiry?")) {
-      setInquiries((prev) => prev.filter((inq) => inq.id !== id));
+  const confirmDelete = async () => {
+    if (inquiryToDelete) {
+      setInquiries((prev) => prev.filter((inq) => inq.id !== inquiryToDelete));
+      await deleteInquiryFromDB(inquiryToDelete);
+      setInquiryToDelete(null);
     }
   };
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      <ConfirmModal
+        isOpen={!!inquiryToDelete}
+        title="Delete Custom Inquiry"
+        message="Are you sure you want to permanently delete this custom inquiry? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setInquiryToDelete(null)}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -52,8 +73,15 @@ export const CustomOrdersPage: React.FC<CustomOrdersPageProps> = ({
       </div>
 
       {/* Inquiry Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {inquiries.map((inq) => (
+      {inquiries.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-2xl border border-[#e4e2de] space-y-3">
+          <Sparkles className="mx-auto text-purple-300" size={40} />
+          <h3 className="text-base font-bold text-gray-700">No Custom Inquiries Yet</h3>
+          <p className="text-xs text-gray-400 max-w-sm mx-auto">When customers submit custom heirloom order requests on your storefront, they will be listed here for review and price quotes.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {inquiries.map((inq) => (
           <div
             key={inq.id}
             className="bg-white rounded-2xl border border-[#e4e2de] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4 flex flex-col justify-between"
@@ -65,7 +93,7 @@ export const CustomOrdersPage: React.FC<CustomOrdersPageProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono text-[#8e4d31] font-bold">{inq.id}</span>
                     <button
-                      onClick={() => deleteInquiry(inq.id)}
+                      onClick={() => setInquiryToDelete(inq.id)}
                       className="p-1 text-gray-400 hover:text-rose-600 rounded transition-colors"
                       title="Delete Inquiry"
                     >
@@ -159,6 +187,7 @@ export const CustomOrdersPage: React.FC<CustomOrdersPageProps> = ({
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 };

@@ -33,9 +33,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { label: "Products & Stock", path: "/products", icon: ShoppingBag },
     { label: "Orders Manager", path: "/orders", icon: PackageCheck, badge: ordersCount },
     { label: "Custom Inquiries", path: "/custom-orders", icon: Sparkles, badge: inquiriesCount },
-    { label: "Artisan Guild", path: "/artisans", icon: Users },
-    { label: "Site Assets & Banners", path: "/assets", icon: Image },
+    { label: "Hero Banners", path: "/banners", icon: Image },
+    { label: "Site Assets", path: "/assets", icon: Store },
   ];
+
 
   return (
     <>

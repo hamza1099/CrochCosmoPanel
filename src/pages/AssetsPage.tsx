@@ -1,5 +1,7 @@
-import React, { useState } from "react";
-import { Save, CheckCircle2, Eye, Image as ImageIcon, Plus, Trash2, ChevronLeft, ChevronRight, Layers, Users } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Save, CheckCircle2, Eye, Image as ImageIcon, Plus, Trash2, ChevronLeft, ChevronRight, Layers, Users, Upload, Loader2 } from "lucide-react";
+import { BannerItem, saveBannerToDB, deleteBannerFromDB, uploadImageToFirebaseStorage } from "../firebase";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 interface HeroBannerItem {
   id: string;
@@ -10,59 +12,91 @@ interface HeroBannerItem {
 }
 
 interface AssetsPageProps {
+  banners?: BannerItem[];
+  setBanners?: React.Dispatch<React.SetStateAction<BannerItem[]>>;
   exchangeRate: number;
   setExchangeRate: (rate: number) => void;
 }
 
-const DEFAULT_HERO_SLIDES: HeroBannerItem[] = [
-  {
-    id: "slide-1",
-    imageUrl: "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=1600&q=80",
-    title: "Men's Crochet Collection — New Arrivals",
-    linkUrl: "/collections/mens",
-    active: true
-  },
-  {
-    id: "slide-2",
-    imageUrl: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=1600&q=80",
-    title: "Heirloom Autumn Knitwear",
-    linkUrl: "/collections/autumn",
-    active: true
-  },
-  {
-    id: "slide-3",
-    imageUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1600&q=80",
-    title: "Artisanal Pure Wool Blanket",
-    linkUrl: "/collections/home",
-    active: true
-  }
-];
+export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exchangeRate, setExchangeRate }) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-const HERO_PRESETS = [
-  {
-    name: "Men's Collection",
-    url: "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=1600&q=80"
-  },
-  {
-    name: "Autumn Handcrafted",
-    url: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=1600&q=80"
-  },
-  {
-    name: "Heirloom Cotton",
-    url: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1600&q=80"
-  },
-  {
-    name: "Artisan Studio",
-    url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=1600&q=80"
-  }
-];
+  const processImageFile = async (file: File): Promise<string> => {
+    // 1. Try Firebase Cloud Storage first
+    try {
+      const url = await uploadImageToFirebaseStorage(file, "banners");
+      if (url) return url;
+    } catch (e) {
+      console.warn("Storage upload failed, falling back to compressed Canvas JPEG:", e);
+    }
 
-export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchangeRate }) => {
+    // 2. Fallback to Canvas JPEG compression (max 1000px width -> ~80KB to fit inside Firestore 1MB limit)
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxWidth = 1000;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.7));
+          } else {
+            resolve(evt.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(evt.target?.result as string);
+        img.src = evt.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setImgFn: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Defer network upload: Store local File object and generate instant local preview DataURL
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          setImgFn(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<"hero" | "category_banners" | "settings">("hero");
 
-  // Hero Slider Banners Array
-  const [heroSlides, setHeroSlides] = useState<HeroBannerItem[]>(DEFAULT_HERO_SLIDES);
+  // Hero Slider Banners Array (Pure dynamic state initialized empty, no hardcoded dummy data)
+  const [heroSlides, setHeroSlides] = useState<HeroBannerItem[]>([]);
   const [currentPreviewSlide, setCurrentPreviewSlide] = useState<number>(0);
+
+  // Sync real-time Firestore banners whenever available
+  useEffect(() => {
+    if (banners !== undefined) {
+      setHeroSlides(
+        banners.map((b) => ({
+          id: b.id,
+          imageUrl: b.imageUrl,
+          title: b.title || "CrochCosmo Luxury Banner",
+          linkUrl: b.linkUrl || "/collections",
+          active: b.active !== false
+        }))
+      );
+    }
+  }, [banners]);
 
   // New Hero Slide State
   const [newSlideUrl, setNewSlideUrl] = useState("");
@@ -83,40 +117,105 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
 
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const handleAddSlide = (e: React.FormEvent) => {
+  const handleAddSlide = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSlideUrl) return;
+    if (!newSlideUrl && !selectedFile) return;
 
-    const newSlide: HeroBannerItem = {
-      id: `slide-${Date.now()}`,
-      imageUrl: newSlideUrl,
-      title: newSlideTitle || `Banner Slide #${heroSlides.length + 1}`,
-      linkUrl: "#",
-      active: true
-    };
+    setIsSubmitting(true);
+    try {
+      let finalImageUrl = newSlideUrl;
+      if (selectedFile) {
+        finalImageUrl = await processImageFile(selectedFile);
+      }
 
-    setHeroSlides((prev) => [...prev, newSlide]);
-    setNewSlideUrl("");
-    setNewSlideTitle("");
-  };
+      const bannerId = `banner-${Date.now()}`;
+      const newSlide: HeroBannerItem = {
+        id: bannerId,
+        imageUrl: finalImageUrl,
+        title: newSlideTitle || `Banner Slide #${heroSlides.length + 1}`,
+        linkUrl: "/collections",
+        active: true
+      };
 
-  const removeSlide = (id: string) => {
-    if (heroSlides.length <= 1) {
-      alert("At least one hero banner image is required.");
-      return;
+      const newBannerItem: BannerItem = {
+        id: bannerId,
+        title: newSlide.title,
+        subtitle: "Handcrafted Luxury",
+        badge: "Featured",
+        imageUrl: newSlide.imageUrl,
+        linkUrl: newSlide.linkUrl,
+        active: true
+      };
+
+      setHeroSlides((prev) => [...prev, newSlide]);
+      setNewSlideUrl("");
+      setNewSlideTitle("");
+      setSelectedFile(null);
+
+      if (setBanners) {
+        setBanners((prev) => [...prev.filter((b) => b.id !== bannerId), newBannerItem]);
+      }
+      await saveBannerToDB(newBannerItem);
+    } catch (err) {
+      console.error("Error adding banner slide:", err);
+    } finally {
+      setIsSubmitting(false);
     }
-    setHeroSlides((prev) => prev.filter((s) => s.id !== id));
-    setCurrentPreviewSlide(0);
   };
 
-  const toggleSlideActive = (id: string) => {
-    setHeroSlides((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s))
-    );
+  const [slideToDelete, setSlideToDelete] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (slideToDelete) {
+      setHeroSlides((prev) => prev.filter((s) => s.id !== slideToDelete));
+      setCurrentPreviewSlide(0);
+
+      if (setBanners) {
+        setBanners((prev) => prev.filter((s) => s.id !== slideToDelete));
+      }
+      await deleteBannerFromDB(slideToDelete);
+      setSlideToDelete(null);
+    }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const toggleSlideActive = async (id: string) => {
+    const updated = heroSlides.map((s) => (s.id === id ? { ...s, active: !s.active } : s));
+    setHeroSlides(updated);
+
+    const target = updated.find((s) => s.id === id);
+    if (target) {
+      const bannerItem: BannerItem = {
+        id: target.id,
+        title: target.title,
+        subtitle: "Handcrafted Luxury",
+        badge: "Featured",
+        imageUrl: target.imageUrl,
+        linkUrl: target.linkUrl,
+        active: target.active
+      };
+
+      if (setBanners) {
+        setBanners((prev) => prev.map((b) => (b.id === id ? bannerItem : b)));
+      }
+      await saveBannerToDB(bannerItem);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Persist all current slides into Firestore collection
+    for (const slide of heroSlides) {
+      await saveBannerToDB({
+        id: slide.id,
+        title: slide.title,
+        subtitle: "Handcrafted Luxury",
+        badge: "Featured",
+        imageUrl: slide.imageUrl,
+        linkUrl: slide.linkUrl,
+        active: slide.active
+      });
+    }
+
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -140,6 +239,14 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      <ConfirmModal
+        isOpen={!!slideToDelete}
+        title="Delete Banner Slide"
+        message="Are you sure you want to delete this hero banner slide? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setSlideToDelete(null)}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -209,50 +316,56 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                 {/* List of current slider banners */}
                 <div className="space-y-3">
                   <span className="font-bold text-gray-600 uppercase text-[10px] block">Active Slider Images</span>
-                  {heroSlides.map((slide, idx) => (
-                    <div
-                      key={slide.id}
-                      className="p-3 bg-[#f8f7f4] rounded-xl border border-[#e4e2de] flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <img
-                          src={slide.imageUrl}
-                          alt={slide.title}
-                          className="w-16 h-10 object-cover rounded-lg border border-gray-200 bg-gray-100 flex-shrink-0"
-                        />
-                        <div className="overflow-hidden">
-                          <span className="font-bold text-[#1b1c1a] block truncate text-xs">
-                            Banner #{idx + 1}: {slide.title || "Untitled Banner"}
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-mono block truncate">
-                            {slide.imageUrl}
-                          </span>
+                  {heroSlides.length === 0 ? (
+                    <div className="p-5 bg-[#f8f7f4] rounded-xl border border-dashed border-[#c7c7bd] text-center text-gray-500 text-xs">
+                      No active hero slider banners found in Database. Upload a photo below to add your first banner.
+                    </div>
+                  ) : (
+                    heroSlides.map((slide, idx) => (
+                      <div
+                        key={slide.id}
+                        className="p-3 bg-[#f8f7f4] rounded-xl border border-[#e4e2de] flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <img
+                            src={slide.imageUrl}
+                            alt={slide.title}
+                            className="w-16 h-10 object-cover rounded-lg border border-gray-200 bg-gray-100 flex-shrink-0"
+                          />
+                          <div className="overflow-hidden">
+                            <span className="font-bold text-[#1b1c1a] block truncate text-xs">
+                              Banner #{idx + 1}: {slide.title || "Untitled Banner"}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-mono block truncate">
+                              {slide.imageUrl}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleSlideActive(slide.id)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
+                              slide.active
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {slide.active ? "Active" : "Hidden"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSlideToDelete(slide.id)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Delete Banner"
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => toggleSlideActive(slide.id)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
-                            slide.active
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-gray-200 text-gray-600"
-                          }`}
-                        >
-                          {slide.active ? "Active" : "Hidden"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeSlide(slide.id)}
-                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="Delete Banner"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
 
                 {/* Add new slide image */}
@@ -262,14 +375,33 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                   </span>
 
                   <div>
-                    <label className="block font-bold text-gray-600 mb-1 uppercase">Banner Image URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://images.unsplash.com/..."
-                      value={newSlideUrl}
-                      onChange={(e) => setNewSlideUrl(e.target.value)}
-                      className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
-                    />
+                    <label className="block font-bold text-gray-600 mb-1 uppercase">Banner Image (Upload Photo or Paste Link)</label>
+                    <div className="flex flex-col sm:flex-row items-stretch gap-2 mb-2">
+                      <label className="px-4 py-2.5 bg-[#8e4d31] hover:bg-[#723c24] text-white text-xs font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap">
+                        <Upload size={15} /> Select Photo File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e, setNewSlideUrl)}
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Or paste URL (https://...)"
+                        value={newSlideUrl}
+                        onChange={(e) => {
+                          setNewSlideUrl(e.target.value);
+                          setSelectedFile(null);
+                        }}
+                        className="flex-grow p-2.5 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
+                      />
+                    </div>
+                    {newSlideUrl && (
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 mb-2">
+                        <img src={newSlideUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -283,34 +415,14 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                     />
                   </div>
 
-                  {/* Preset Banner Quick Selection */}
-                  <div>
-                    <label className="block font-bold text-gray-500 mb-2 uppercase text-[10px]">Or Pick High-Res Preset Banner Image:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {HERO_PRESETS.map((preset) => (
-                        <button
-                          type="button"
-                          key={preset.name}
-                          onClick={() => {
-                            setNewSlideUrl(preset.url);
-                            setNewSlideTitle(preset.name);
-                          }}
-                          className="flex items-center gap-2 p-1.5 rounded-xl border border-gray-200 hover:border-[#8e4d31] hover:bg-amber-50/40 text-left transition-all"
-                        >
-                          <img src={preset.url} alt={preset.name} className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
-                          <span className="text-[11px] font-semibold text-gray-700 line-clamp-1">{preset.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <button
                     type="button"
                     onClick={handleAddSlide}
-                    disabled={!newSlideUrl}
-                    className="w-full py-2.5 bg-[#585e4c] hover:bg-[#717763] disabled:opacity-50 text-white text-xs font-bold uppercase rounded-xl transition-all shadow-xs"
+                    disabled={!newSlideUrl || isSubmitting}
+                    className="w-full py-2.5 bg-[#585e4c] hover:bg-[#717763] disabled:opacity-50 text-white text-xs font-bold uppercase rounded-xl transition-all shadow-xs flex items-center justify-center gap-2"
                   >
-                    + Add Banner To Carousel
+                    {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                    {isSubmitting ? "Uploading & Publishing Banner..." : "+ Add Banner To Carousel"}
                   </button>
                 </div>
               </div>
@@ -331,13 +443,25 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                     <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded">Women Tab</span>
                   </div>
                   <div>
-                    <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Women Banner Image URL</label>
-                    <input
-                      type="text"
-                      value={womenBannerUrl}
-                      onChange={(e) => setWomenBannerUrl(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
-                    />
+                    <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Women Banner Image</label>
+                    <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                      <label className="px-3 py-2 bg-[#8e4d31] hover:bg-[#723c24] text-white text-[11px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1 shadow-xs whitespace-nowrap">
+                        <Upload size={13} /> Upload File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e, setWomenBannerUrl)}
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Or paste URL..."
+                        value={womenBannerUrl}
+                        onChange={(e) => setWomenBannerUrl(e.target.value)}
+                        className="flex-grow p-2.5 bg-white border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Tagline Text</label>
@@ -357,13 +481,25 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">Men Tab</span>
                   </div>
                   <div>
-                    <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Men Banner Image URL</label>
-                    <input
-                      type="text"
-                      value={menBannerUrl}
-                      onChange={(e) => setMenBannerUrl(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
-                    />
+                    <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Men Banner Image</label>
+                    <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                      <label className="px-3 py-2 bg-[#8e4d31] hover:bg-[#723c24] text-white text-[11px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1 shadow-xs whitespace-nowrap">
+                        <Upload size={13} /> Upload File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e, setMenBannerUrl)}
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Or paste URL..."
+                        value={menBannerUrl}
+                        onChange={(e) => setMenBannerUrl(e.target.value)}
+                        className="flex-grow p-2.5 bg-white border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Tagline Text</label>
@@ -383,13 +519,25 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                     <span className="text-[10px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded">Baby Tab</span>
                   </div>
                   <div>
-                    <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Baby Banner Image URL</label>
-                    <input
-                      type="text"
-                      value={babyBannerUrl}
-                      onChange={(e) => setBabyBannerUrl(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
-                    />
+                    <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Baby Banner Image</label>
+                    <div className="flex flex-col sm:flex-row items-stretch gap-2">
+                      <label className="px-3 py-2 bg-[#8e4d31] hover:bg-[#723c24] text-white text-[11px] font-bold uppercase rounded-xl cursor-pointer flex items-center justify-center gap-1 shadow-xs whitespace-nowrap">
+                        <Upload size={13} /> Upload File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e, setBabyBannerUrl)}
+                        />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Or paste URL..."
+                        value={babyBannerUrl}
+                        onChange={(e) => setBabyBannerUrl(e.target.value)}
+                        className="flex-grow p-2.5 bg-white border border-[#c7c7bd] rounded-xl focus:outline-none focus:border-[#8e4d31] font-mono text-[11px]"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block font-bold text-gray-600 mb-1 uppercase text-[10px]">Tagline Text</label>
@@ -511,7 +659,7 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ exchangeRate, setExchang
                         src={activeSlides[activeSlideIndex]?.imageUrl}
                         alt={activeSlides[activeSlideIndex]?.title}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = HERO_PRESETS[0].url;
+                          (e.target as HTMLImageElement).src = "https://via.placeholder.com/800x400?text=Image+Not+Found";
                         }}
                         className="w-full h-full min-h-[280px] object-cover transition-all duration-500"
                       />
