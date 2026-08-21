@@ -10,7 +10,9 @@ import {
   Layers,
   Store,
   X,
-  LogOut
+  LogOut,
+  GraduationCap,
+  Video
 } from "lucide-react";
 import logoUrl from "../assets/Logo.jpg";
 import { auth } from "../firebase";
@@ -20,6 +22,7 @@ import { toast } from "react-toastify";
 interface AdminSidebarProps {
   ordersCount: number;
   inquiriesCount: number;
+  masterclassesCount?: number;
   exchangeRate: number;
   isOpen: boolean;
   onClose: () => void;
@@ -28,6 +31,7 @@ interface AdminSidebarProps {
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ 
   ordersCount, 
   inquiriesCount, 
+  masterclassesCount,
   exchangeRate,
   isOpen, 
   onClose 
@@ -39,10 +43,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { label: "Products & Stock", path: "/products", icon: ShoppingBag },
     { label: "Orders Manager", path: "/orders", icon: PackageCheck, badge: ordersCount },
     { label: "Custom Inquiries", path: "/custom-orders", icon: Sparkles, badge: inquiriesCount },
+    { label: "Masterclasses", path: "/masterclasses", icon: GraduationCap, badge: masterclassesCount },
+    { label: "Video Tutorials", path: "/tutorials", icon: Video },
     { label: "Hero Banners", path: "/banners", icon: Image },
     { label: "Popular Categories", path: "/popular-categories", icon: Layers },
     { label: "Site Assets", path: "/assets", icon: Store },
   ];
+
 
 
   return (

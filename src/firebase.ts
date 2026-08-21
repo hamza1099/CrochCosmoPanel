@@ -1,14 +1,14 @@
 import { initializeApp, getApps } from "firebase/app";
-import { 
-  initializeFirestore, 
-  collection, 
-  getDocs, 
-  addDoc, 
+import {
+  initializeFirestore,
+  collection,
+  getDocs,
+  addDoc,
   setDoc,
-  updateDoc, 
-  deleteDoc, 
+  updateDoc,
+  deleteDoc,
   doc,
-  serverTimestamp 
+  serverTimestamp
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -278,6 +278,37 @@ export const fetchPopularCategoriesFromDB = async (): Promise<PopularCategoryIte
   }
 };
 
+export interface CategoryBannersConfig {
+  womenBannerUrl: string;
+  womenBannerTagline: string;
+  menBannerUrl: string;
+  menBannerTagline: string;
+  babyBannerUrl: string;
+  babyBannerTagline: string;
+}
+
+export const fetchCategoryBannersDB = async (): Promise<CategoryBannersConfig | null> => {
+  try {
+    const docRef = doc(db, "settings", "category_banners");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as CategoryBannersConfig;
+    }
+    return null;
+  } catch (err) {
+    console.error("Error fetching category banners from Firestore:", err);
+    return null;
+  }
+};
+
+export const saveCategoryBannersDB = async (config: CategoryBannersConfig) => {
+  try {
+    await setDoc(doc(db, "settings", "category_banners"), config);
+  } catch (err) {
+    console.error("Error saving category banners to Firestore:", err);
+  }
+};
+
 export const savePopularCategoryToDB = async (category: PopularCategoryItem) => {
   try {
     const cId = category.id || `popcat-${Date.now()}`;
@@ -292,6 +323,75 @@ export const deletePopularCategoryFromDB = async (id: string) => {
     await deleteDoc(doc(db, "popular_categories", id));
   } catch (err) {
     console.error("Error deleting popular category from Firestore:", err);
+  }
+};
+
+export interface MasterclassRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  requestedDate: string;
+  skillLevel: string;
+  goals: string;
+  status: "New" | "In Review" | "Confirmed" | "Completed" | "Cancelled";
+  date: string; // the date the masterclass was requested
+  createdAt: string; // ISO string of when requested
+}
+
+export interface TutorialItem {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  imageUrl: string;
+  videoUrl: string;
+  active: boolean;
+  order: number;
+}
+
+export const saveMasterclassRequestToDB = async (request: MasterclassRequest) => {
+  try {
+    await setDoc(doc(db, "masterclass_requests", request.id), request, { merge: true });
+  } catch (err) {
+    console.error("Error saving masterclass request to Firestore:", err);
+  }
+};
+
+export const deleteMasterclassRequestFromDB = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, "masterclass_requests", id));
+  } catch (err) {
+    console.error("Error deleting masterclass request from Firestore:", err);
+  }
+};
+
+export const fetchTutorialsFromDB = async (): Promise<TutorialItem[]> => {
+  try {
+    const snap = await getDocs(collection(db, "tutorials"));
+    if (snap.empty) return [];
+    return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as TutorialItem));
+  } catch (err) {
+    console.error("Error fetching tutorials from Firestore:", err);
+    return [];
+  }
+};
+
+export const saveTutorialToDB = async (tutorial: TutorialItem) => {
+  try {
+    const tId = tutorial.id || `tut-${Date.now()}`;
+    await setDoc(doc(db, "tutorials", tId), { ...tutorial, id: tId });
+  } catch (err) {
+    console.error("Error saving tutorial to Firestore:", err);
+  }
+};
+
+export const deleteTutorialFromDB = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, "tutorials", id));
+  } catch (err) {
+    console.error("Error deleting tutorial from Firestore:", err);
   }
 };
 

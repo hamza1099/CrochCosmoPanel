@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Search, Mail, Phone, Trash2, Package } from "lucide-react";
+import { Search, Mail, Phone, Trash2, Package, Copy, Check, MessageSquare } from "lucide-react";
 import { OrderItem, deleteOrderFromDB } from "../firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { toast } from "react-toastify";
 
 interface OrdersPageProps {
   orders: OrderItem[];
@@ -13,11 +14,19 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const updateOrderStatus = (orderId: string, newStatus: OrderItem["status"]) => {
     setOrders((prev) =>
       prev.map((ord) => (ord.id === orderId ? { ...ord, status: newStatus } : ord))
     );
+  };
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    toast.success(`Tracking ID ${id} copied!`);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const confirmDelete = async () => {
@@ -33,7 +42,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
     const matchesSearch =
       o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.email.toLowerCase().includes(searchTerm.toLowerCase());
+      o.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.phone.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -66,10 +76,10 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by order ID or name..."
+              placeholder="Search by order ID, name or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-2 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl text-xs w-full md:w-60 focus:outline-none focus:border-[#8e4d31]"
+              className="pl-9 pr-3 py-2 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl text-xs w-full md:w-64 focus:outline-none focus:border-[#8e4d31]"
             />
           </div>
 
@@ -106,6 +116,12 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
         ) : (
           filteredOrders.map((ord) => {
             const calculatedPKR = Math.round(ord.totalUSD * exchangeRate);
+            const cleanPhone = ord.phone ? ord.phone.replace(/\D/g, "") : "";
+            const waMessage = encodeURIComponent(
+              `Hello ${ord.customerName}! Thank you for your order at CrochCosmo.\n\nYour Order Tracking ID is: *${ord.id}*\n\nYou can track your order status live anytime using this Tracking ID on our website.`
+            );
+            const waUrl = `https://wa.me/${cleanPhone}?text=${waMessage}`;
+
             return (
               <div
                 key={ord.id}
@@ -118,8 +134,30 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
                       #
                     </div>
                     <div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-mono font-bold text-[#8e4d31] text-base">{ord.id}</h3>
+                        <button
+                          onClick={() => handleCopyId(ord.id)}
+                          className="px-2 py-0.5 bg-[#f5f3ef] hover:bg-[#e4e2de] text-[#585e4c] rounded text-[11px] font-semibold flex items-center gap-1 transition-colors border border-[#c7c7bd]"
+                          title="Copy Tracking ID"
+                        >
+                          {copiedId === ord.id ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                          <span>{copiedId === ord.id ? "Copied" : "Copy ID"}</span>
+                        </button>
+
+                        {cleanPhone && (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded text-[11px] font-bold flex items-center gap-1 transition-colors border border-green-200"
+                            title="Send Tracking ID on WhatsApp"
+                          >
+                            <MessageSquare size={12} />
+                            <span>WhatsApp ID</span>
+                          </a>
+                        )}
+
                         <span className="text-xs text-gray-400">Placed on {ord.date}</span>
                       </div>
                       <span className="text-xs text-gray-600 font-semibold">{ord.itemsCount} Handcrafted Item(s)</span>

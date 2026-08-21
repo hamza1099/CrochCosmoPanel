@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Save, CheckCircle2, Eye, Image as ImageIcon, Plus, Trash2, ChevronLeft, ChevronRight, Layers, Users, Upload, Loader2 } from "lucide-react";
-import { BannerItem, saveBannerToDB, deleteBannerFromDB } from "../firebase";
+import { BannerItem, saveBannerToDB, deleteBannerFromDB, fetchCategoryBannersDB, saveCategoryBannersDB } from "../firebase";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { uploadToBunny, deleteFromBunny } from "../services/bunnyStorageService";
 import { toast } from "react-toastify";
@@ -79,7 +79,6 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
   const [newSlideUrl, setNewSlideUrl] = useState("");
   const [newSlideTitle, setNewSlideTitle] = useState("");
 
-  // Category Banners State (Women, Men, Baby)
   const [womenBannerUrl, setWomenBannerUrl] = useState("https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=1400&q=80");
   const [womenBannerTagline, setWomenBannerTagline] = useState("Exclusive Women's Line • Handcrafted Cardigans, Sweaters & Apparel");
 
@@ -88,6 +87,19 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
 
   const [babyBannerUrl, setBabyBannerUrl] = useState("https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1400&q=80");
   const [babyBannerTagline, setBabyBannerTagline] = useState("Exclusive Baby & Kids Line • Gentle Organic Cotton & Soft Wool Sets");
+
+  useEffect(() => {
+    fetchCategoryBannersDB().then((config) => {
+      if (config) {
+        setWomenBannerUrl(config.womenBannerUrl || "");
+        setWomenBannerTagline(config.womenBannerTagline || "");
+        setMenBannerUrl(config.menBannerUrl || "");
+        setMenBannerTagline(config.menBannerTagline || "");
+        setBabyBannerUrl(config.babyBannerUrl || "");
+        setBabyBannerTagline(config.babyBannerTagline || "");
+      }
+    });
+  }, []);
 
   // Category Preview Active Tab
   const [previewCategoryTab, setPreviewCategoryTab] = useState<"women" | "men" | "baby">("women");
@@ -235,6 +247,16 @@ export const AssetsPage: React.FC<AssetsPageProps> = ({ banners, setBanners, exc
         active: slide.active
       });
     }
+
+    // Persist category banners
+    await saveCategoryBannersDB({
+      womenBannerUrl,
+      womenBannerTagline,
+      menBannerUrl,
+      menBannerTagline,
+      babyBannerUrl,
+      babyBannerTagline,
+    });
 
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);

@@ -11,6 +11,8 @@ import { BannersPage } from "./pages/BannersPage";
 import { AssetsPage } from "./pages/AssetsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PopularCategoriesPage } from "./pages/PopularCategoriesPage";
+import { MasterclassRequestsPage } from "./pages/MasterclassRequestsPage";
+import { TutorialsPage } from "./pages/TutorialsPage";
 
 
 import { 
@@ -25,6 +27,8 @@ import {
   Artisan,
   BannerItem,
   PopularCategoryItem,
+  MasterclassRequest,
+  TutorialItem,
   db,
   seedInitialDataIfEmpty,
   saveProductToDB,
@@ -37,10 +41,12 @@ import {
   deleteBannerFromDB,
   savePopularCategoryToDB,
   deletePopularCategoryFromDB,
+  saveTutorialToDB,
+  deleteTutorialFromDB,
   auth
 } from "./firebase";
 import { SkeletonLoader } from "./components/SkeletonLoader";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -52,6 +58,9 @@ export const App: React.FC = () => {
   const [artisans, setArtisans] = useState<Artisan[]>([]);
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [popularCategories, setPopularCategories] = useState<PopularCategoryItem[]>([]);
+  const [masterclassRequests, setMasterclassRequests] = useState<MasterclassRequest[]>([]);
+  const [tutorials, setTutorials] = useState<TutorialItem[]>([]);
+  
   const [exchangeRate, setExchangeRate] = useState<number>(280);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -123,6 +132,26 @@ export const App: React.FC = () => {
       (error) => console.error("Popular Categories snapshot error:", error)
     );
 
+    // Listen to real-time masterclass requests
+    const unsubMasterclasses = onSnapshot(
+      query(collection(db, "masterclass_requests")),
+      (snapshot) => {
+        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MasterclassRequest));
+        setMasterclassRequests(list);
+      },
+      (error) => console.error("Masterclass snapshot error:", error)
+    );
+
+    // Listen to real-time tutorials updates from Firestore
+    const unsubTutorials = onSnapshot(
+      collection(db, "tutorials"),
+      (snapshot) => {
+        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as TutorialItem));
+        setTutorials(list);
+      },
+      (error) => console.error("Tutorials snapshot error:", error)
+    );
+
     // Simulate loading for the skeleton
     const loadingTimer = setTimeout(() => {
       setIsLoading(false);
@@ -135,10 +164,22 @@ export const App: React.FC = () => {
       unsubArtisans();
       unsubBanners();
       unsubPopularCategories();
+      unsubMasterclasses();
+      unsubTutorials();
       unsubscribeAuth();
       clearTimeout(loadingTimer);
     };
   }, []);
+
+  const handleSetTutorials: React.Dispatch<React.SetStateAction<TutorialItem[]>> = (action) => {
+    setTutorials((prev) => {
+      const next = typeof action === "function" ? action(prev) : action;
+      next.forEach((t) => saveTutorialToDB(t));
+      const nextIds = new Set(next.map((t) => t.id));
+      prev.filter((t) => !nextIds.has(t.id)).forEach((t) => deleteTutorialFromDB(t.id));
+      return next;
+    });
+  };
 
   // Set state wrappers that sync with Firestore DB
   const handleSetProducts: React.Dispatch<React.SetStateAction<ProductItem[]>> = (action) => {
@@ -221,6 +262,7 @@ export const App: React.FC = () => {
         <AdminSidebar 
           ordersCount={orders.length} 
           inquiriesCount={inquiries.length}
+          masterclassesCount={masterclassRequests.length}
           exchangeRate={exchangeRate}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -285,6 +327,16 @@ export const App: React.FC = () => {
                 }
               />
               <Route
+                path="/masterclasses"
+                element={
+                  <MasterclassRequestsPage requests={masterclassRequests} />
+                }
+              />
+              <Route
+                path="/tutorials"
+                element={<TutorialsPage tutorials={tutorials} setTutorials={handleSetTutorials} />}
+              />
+              <Route
                 path="/banners"
                 element={<BannersPage banners={banners} setBanners={handleSetBanners} />}
               />
@@ -314,4 +366,3 @@ export const App: React.FC = () => {
 
 
 export default App;
-
