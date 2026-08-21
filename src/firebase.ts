@@ -92,11 +92,22 @@ export interface BannerItem {
   active: boolean;
 }
 
+export interface PopularCategoryItem {
+  id: string;
+  title: string;
+  categoryName: string;
+  imageUrl: string;
+  active: boolean;
+  order: number;
+}
+
 export const INITIAL_PRODUCTS: ProductItem[] = [];
 export const INITIAL_ORDERS: OrderItem[] = [];
 export const INITIAL_INQUIRIES: CustomInquiry[] = [];
 export const INITIAL_ARTISANS: Artisan[] = [];
 export const INITIAL_BANNERS: BannerItem[] = [];
+export const INITIAL_POPULAR_CATEGORIES: PopularCategoryItem[] = [];
+
 
 // Helper to upload image files directly to Firebase Storage
 export const uploadImageToFirebaseStorage = async (file: File, folder: string = "products"): Promise<string> => {
@@ -253,6 +264,34 @@ export const deleteBannerFromDB = async (id: string) => {
     await deleteDoc(doc(db, "banners", id));
   } catch (err) {
     console.error("Error deleting banner from Firestore:", err);
+  }
+};
+
+export const fetchPopularCategoriesFromDB = async (): Promise<PopularCategoryItem[]> => {
+  try {
+    const snap = await getDocs(collection(db, "popular_categories"));
+    if (snap.empty) return [];
+    return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PopularCategoryItem));
+  } catch (err) {
+    console.error("Error fetching popular categories from Firestore:", err);
+    return [];
+  }
+};
+
+export const savePopularCategoryToDB = async (category: PopularCategoryItem) => {
+  try {
+    const cId = category.id || `popcat-${Date.now()}`;
+    await setDoc(doc(db, "popular_categories", cId), { ...category, id: cId });
+  } catch (err) {
+    console.error("Error saving popular category to Firestore:", err);
+  }
+};
+
+export const deletePopularCategoryFromDB = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, "popular_categories", id));
+  } catch (err) {
+    console.error("Error deleting popular category from Firestore:", err);
   }
 };
 

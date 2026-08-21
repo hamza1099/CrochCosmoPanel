@@ -39,6 +39,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      <ConfirmModal
+        isOpen={!!orderToDelete}
+        title="Delete Order"
+        message="Are you sure you want to delete this order? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setOrderToDelete(null)}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

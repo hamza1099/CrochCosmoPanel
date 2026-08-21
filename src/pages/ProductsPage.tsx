@@ -20,7 +20,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
   // Form State for Adding / Editing Product
   const [formName, setFormName] = useState("");
-  const [formCategory, setFormCategory] = useState("Baby Apparel");
+  const [formCategory, setFormCategory] = useState("Baby Collection");
   const [formYarnType, setFormYarnType] = useState("Organic Wool");
   const [formPrice, setFormPrice] = useState<number | string>(55.00);
   const [formBadge, setFormBadge] = useState("ORGANIC WOOL");
@@ -42,7 +42,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
 
   const resetForm = () => {
     setFormName("");
-    setFormCategory("Baby Apparel");
+    setFormCategory("Baby Collection");
     setFormYarnType("Organic Wool");
     setFormPrice(55.00);
     setFormBadge("ORGANIC WOOL");
@@ -245,11 +245,17 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
             className="bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl px-3 py-2 text-xs text-[#1b1c1a] focus:outline-none font-semibold"
           >
             <option value="All">All Categories</option>
-            <option value="Baby Apparel">Baby Apparel</option>
+            <option value="Baby Collection">Baby Collection</option>
             <option value="Women's Fashion">Women's Fashion</option>
             <option value="Men's Fashion">Men's Fashion</option>
             <option value="Amigurumi">Amigurumi</option>
             <option value="Gifts & Home">Gifts & Home</option>
+            <option value="Crochet Keychains">Crochet Keychains</option>
+            <option value="Book Lovers">Book Lovers</option>
+            <option value="Crochet Hair Acc">Crochet Hair Acc</option>
+            <option value="Garments">Garments</option>
+            <option value="Plushies">Plushies</option>
+            <option value="Blankets">Blankets</option>
           </select>
         </div>
 
@@ -598,11 +604,17 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ products, setProduct
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full p-3 bg-[#f8f7f4] border border-[#c7c7bd] rounded-xl focus:outline-none font-medium"
                   >
-                    <option value="Baby Apparel">Baby Apparel</option>
+                    <option value="Baby Collection">Baby Collection</option>
                     <option value="Women's Fashion">Women's Fashion</option>
                     <option value="Men's Fashion">Men's Fashion</option>
                     <option value="Amigurumi">Amigurumi</option>
                     <option value="Gifts & Home">Gifts & Home</option>
+                    <option value="Crochet Keychains">Crochet Keychains</option>
+                    <option value="Book Lovers">Book Lovers</option>
+                    <option value="Crochet Hair Acc">Crochet Hair Acc</option>
+                    <option value="Garments">Garments</option>
+                    <option value="Plushies">Plushies</option>
+                    <option value="Blankets">Blankets</option>
                   </select>
                 </div>
                 <div>

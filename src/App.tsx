@@ -10,6 +10,7 @@ import { ArtisansPage } from "./pages/ArtisansPage";
 import { BannersPage } from "./pages/BannersPage";
 import { AssetsPage } from "./pages/AssetsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { PopularCategoriesPage } from "./pages/PopularCategoriesPage";
 
 
 import { 
@@ -23,6 +24,7 @@ import {
   CustomInquiry,
   Artisan,
   BannerItem,
+  PopularCategoryItem,
   db,
   seedInitialDataIfEmpty,
   saveProductToDB,
@@ -33,6 +35,8 @@ import {
   deleteArtisanFromDB,
   saveBannerToDB,
   deleteBannerFromDB,
+  savePopularCategoryToDB,
+  deletePopularCategoryFromDB,
   auth
 } from "./firebase";
 import { SkeletonLoader } from "./components/SkeletonLoader";
@@ -47,6 +51,7 @@ export const App: React.FC = () => {
   const [inquiries, setInquiries] = useState<CustomInquiry[]>([]);
   const [artisans, setArtisans] = useState<Artisan[]>([]);
   const [banners, setBanners] = useState<BannerItem[]>([]);
+  const [popularCategories, setPopularCategories] = useState<PopularCategoryItem[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(280);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -108,6 +113,16 @@ export const App: React.FC = () => {
       (error) => console.error("Banners snapshot error:", error)
     );
 
+    // Listen to real-time popular categories updates from Firestore
+    const unsubPopularCategories = onSnapshot(
+      collection(db, "popular_categories"),
+      (snapshot) => {
+        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PopularCategoryItem));
+        setPopularCategories(list);
+      },
+      (error) => console.error("Popular Categories snapshot error:", error)
+    );
+
     // Simulate loading for the skeleton
     const loadingTimer = setTimeout(() => {
       setIsLoading(false);
@@ -119,6 +134,7 @@ export const App: React.FC = () => {
       unsubInquiries();
       unsubArtisans();
       unsubBanners();
+      unsubPopularCategories();
       unsubscribeAuth();
       clearTimeout(loadingTimer);
     };
@@ -167,6 +183,16 @@ export const App: React.FC = () => {
       next.forEach((b) => saveBannerToDB(b));
       const nextIds = new Set(next.map((b) => b.id));
       prev.filter((b) => !nextIds.has(b.id)).forEach((b) => deleteBannerFromDB(b.id));
+      return next;
+    });
+  };
+
+  const handleSetPopularCategories: React.Dispatch<React.SetStateAction<PopularCategoryItem[]>> = (action) => {
+    setPopularCategories((prev) => {
+      const next = typeof action === "function" ? action(prev) : action;
+      next.forEach((c) => savePopularCategoryToDB(c));
+      const nextIds = new Set(next.map((c) => c.id));
+      prev.filter((c) => !nextIds.has(c.id)).forEach((c) => deletePopularCategoryFromDB(c.id));
       return next;
     });
   };
@@ -272,6 +298,10 @@ export const App: React.FC = () => {
                     setExchangeRate={setExchangeRate} 
                   />
                 }
+              />
+              <Route
+                path="/popular-categories"
+                element={<PopularCategoriesPage popularCategories={popularCategories} setPopularCategories={handleSetPopularCategories} />}
               />
             </Routes>
             )}

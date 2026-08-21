@@ -7,6 +7,7 @@ import {
   Sparkles, 
   Users, 
   Image, 
+  Layers,
   Store,
   X,
   LogOut
@@ -39,6 +40,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { label: "Orders Manager", path: "/orders", icon: PackageCheck, badge: ordersCount },
     { label: "Custom Inquiries", path: "/custom-orders", icon: Sparkles, badge: inquiriesCount },
     { label: "Hero Banners", path: "/banners", icon: Image },
+    { label: "Popular Categories", path: "/popular-categories", icon: Layers },
     { label: "Site Assets", path: "/assets", icon: Store },
   ];
 
