@@ -3,6 +3,7 @@ import {
   initializeFirestore,
   collection,
   getDocs,
+  getDoc,
   addDoc,
   setDoc,
   updateDoc,
@@ -58,6 +59,16 @@ export interface OrderItem {
   currency: string;
   status: "Pending" | "Processing" | "Shipped" | "Delivered" | "Cancelled";
   paymentMethod: string;
+  paymentDetails?: {
+    methodName?: string;
+    accountTitle?: string;
+    accountNumber?: string;
+    iban?: string;
+    senderAccount?: string;
+    transactionId?: string;
+    screenshotUrl?: string;
+    note?: string;
+  };
   date: string;
   itemsCount: number;
 }

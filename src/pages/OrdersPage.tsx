@@ -209,11 +209,34 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ orders, setOrders, excha
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-gray-400 font-bold uppercase block">Payment & Currency</span>
+                    <span className="text-gray-400 font-bold uppercase block">Payment & Method</span>
                     <p className="font-bold text-[#1b1c1a]">{ord.paymentMethod}</p>
                     <span className="inline-block px-2 py-0.5 bg-gray-100 rounded text-[10px] font-bold text-gray-600 border border-gray-200">
-                      Currency Mode: {ord.currency}
+                      Currency: {ord.currency || "PKR"}
                     </span>
+
+                    {ord.paymentDetails && (
+                      <div className="mt-2 p-2.5 bg-[#f8f7f4] rounded-xl border border-[#e4e2de] text-[11px] space-y-1">
+                        {ord.paymentDetails.senderAccount && (
+                          <p><strong className="text-gray-600">Sender Account:</strong> {ord.paymentDetails.senderAccount}</p>
+                        )}
+                        {ord.paymentDetails.transactionId && (
+                          <p><strong className="text-gray-600">TID / Ref:</strong> <span className="font-mono text-[#8e4d31] font-bold">{ord.paymentDetails.transactionId}</span></p>
+                        )}
+                        {ord.paymentDetails.screenshotUrl && (
+                          <div className="pt-1">
+                            <a
+                              href={ord.paymentDetails.screenshotUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-[#8e4d31] text-white rounded text-[10px] font-bold hover:bg-[#71361d] transition-colors"
+                            >
+                              <span>View Payment Screenshot ↗</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1 sm:text-right">
